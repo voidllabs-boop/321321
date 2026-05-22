@@ -20,7 +20,7 @@ logging.basicConfig(
 log = logging.getLogger("bot")
 
 # Store your token in an environment variable: export DISCORD_TOKEN="your_token"
-TOKEN = os.getenv("DISCORD_TOKEN", "MTUwNzMzODI1MjI1ODkwNjI1Mg.G8-Tj8.l-_aC_BqYt-bKw3fc1NMH6qgP89N1J3B-TIDG4")
+TOKEN = os.getenv("DISCORD_TOKEN", "")
 
 
 def create_bot() -> commands.InteractionBot:
