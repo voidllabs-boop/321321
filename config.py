@@ -38,7 +38,8 @@ def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
 
 @dataclass(frozen=True)
 class Settings:
-    discord_token: str
+    interserver_token: Optional[str]
+    rp_token: Optional[str]
     groq_api_key: str
     groq_model: str = "llama-3.3-70b-versatile"
     dev_guild_ids: list[int] = field(default_factory=list)
@@ -54,10 +55,14 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    token = os.environ.get("DISCORD_TOKEN", "").strip()
+    interserver_token = os.environ.get("TOKEN", "").strip() or None
+    rp_token = os.environ.get("DISCORD_TOKEN", "").strip() or None
+    
     groq_key = os.environ.get("GROQ_API_KEY", "").strip()
-    if not token:
-        raise RuntimeError("DISCORD_TOKEN is not set. Copy .env.example to .env and fill it in.")
+    
+    if not interserver_token and not rp_token:
+        raise RuntimeError("Neither TOKEN nor DISCORD_TOKEN is set. At least one must be provided.")
+    
     if not groq_key:
         raise RuntimeError("GROQ_API_KEY is not set. Copy .env.example to .env and fill it in.")
 
@@ -68,7 +73,8 @@ def load_settings() -> Settings:
         timeout = 60.0
 
     return Settings(
-        discord_token=token,
+        interserver_token=interserver_token,
+        rp_token=rp_token,
         groq_api_key=groq_key,
         groq_model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
         or "llama-3.3-70b-versatile",

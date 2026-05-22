@@ -8,6 +8,7 @@ Requires environment variables:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 
@@ -83,6 +84,25 @@ class RoleplayBot(commands.InteractionBot):
             await super().close()
 
 
+async def start_bot(token: str, extensions: list[str], settings: Settings, name: str) -> None:
+    bot = RoleplayBot(settings=settings)
+    for ext in extensions:
+        bot.load_extension(ext)
+    
+    logger.info("Starting %s bot with extensions: %s", name, extensions)
+    
+    try:
+        await bot.start(token)
+    except disnake.LoginFailure:
+        logger.error("Invalid token for %s bot.", name)
+    except disnake.PrivilegedIntentsRequired:
+        logger.error(
+            "Bot %s requires privileged intents (MEMBERS, MESSAGE CONTENT).", name
+        )
+    except Exception as e:
+        logger.exception("Error in %s bot: %s", name, e)
+
+
 def _configure_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -93,7 +113,7 @@ def _configure_logging() -> None:
     logging.getLogger("disnake").setLevel(logging.INFO)
 
 
-def main() -> None:
+async def main_async() -> None:
     _configure_logging()
     try:
         settings = load_settings()
@@ -102,25 +122,33 @@ def main() -> None:
         sys.exit(1)
 
     keep_alive()
-    bot = RoleplayBot(settings=settings)
-    bot.load_extension("cogs.setup_rp")
-    bot.load_extension("cogs.roleplay")
-    bot.load_extension("cogs.interserver")
-    bot.load_extension("cogs.translate")
+    
+    tasks = []
+    
+    if settings.interserver_token:
+        tasks.append(start_bot(
+            settings.interserver_token, 
+            ["cogs.interserver", "cogs.translate"], 
+            settings, 
+            "InterServer/Translate"
+        ))
+        
+    if settings.rp_token:
+        tasks.append(start_bot(
+            settings.rp_token, 
+            ["cogs.setup_rp", "cogs.roleplay"], 
+            settings, 
+            "Roleplay"
+        ))
 
-    try:
-        bot.run(settings.discord_token)
-    except disnake.LoginFailure:
-        logger.error("Invalid DISCORD_TOKEN — check your .env file.")
-        sys.exit(2)
-    except disnake.PrivilegedIntentsRequired:
-        logger.error(
-            "This bot requires the SERVER MEMBERS and MESSAGE CONTENT privileged intents. "
-            "Enable them at https://discord.com/developers/applications under your bot's "
-            "'Bot' tab → Privileged Gateway Intents."
-        )
-        sys.exit(3)
+    if tasks:
+        await asyncio.gather(*tasks)
+    else:
+        logger.error("No bots to start.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        pass
