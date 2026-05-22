@@ -4,6 +4,8 @@ cogs/translate.py - Translation cog.
 Provides prefix commands: *t, *translate, *trans, *tr, *tl
 Translates text from any language to any specified target language.
 Uses Google Translate via deep-translator.
+
+Renders results using Components V2 (Container), not embeds.
 """
 
 import asyncio
@@ -11,16 +13,17 @@ import logging
 
 import disnake
 from disnake.ext import commands
+from disnake.ui import Container, Separator, TextDisplay
 from deep_translator import GoogleTranslator
 
 log = logging.getLogger("translate")
 
-# Red accent colour — USSR | United Servers of Sovereign Republics
+# Red accent colour - USSR | United Servers of Sovereign Republics
 USSR_COLOUR = disnake.Colour(0xCC0000)
 
 FOOTER_TEXT = "USSR | United Servers of Sovereign Republics"
 
-# Extra aliases: Russian / common short-hand names → ISO 639-1 codes
+# Extra aliases: Russian / common short-hand names -> ISO 639-1 codes
 _EXTRA_ALIASES: dict[str, str] = {
     # Russian language names
     "английский": "en",
@@ -168,6 +171,10 @@ _LANG_DISPLAY: dict[str, str] = {
 
 MAX_TRANSLATE_LEN = 5000
 
+# Maximum length for the original-text preview inside the container.
+# A TextDisplay component can hold up to 4000 characters.
+PREVIEW_LEN = 1024
+
 
 class TranslateCog(commands.Cog, name="Translate"):
     """Translation commands for the bot."""
@@ -196,10 +203,18 @@ class TranslateCog(commands.Cog, name="Translate"):
     def _lang_display(self, code: str) -> str:
         return _LANG_DISPLAY.get(code, code.upper())
 
-    def _error_embed(self, description: str) -> disnake.Embed:
-        embed = disnake.Embed(description=description, colour=USSR_COLOUR)
-        embed.set_footer(text=FOOTER_TEXT)
-        return embed
+    def _error_container(self, description: str) -> Container:
+        return Container(
+            TextDisplay(description),
+            Separator(),
+            TextDisplay(f"-# {FOOTER_TEXT}"),
+            accent_colour=USSR_COLOUR,
+        )
+
+    def _truncate(self, text: str, limit: int) -> str:
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1] + "…"
 
     @commands.command(name="t", aliases=["translate", "trans", "tr", "tl"])
     async def translate_cmd(
@@ -213,39 +228,43 @@ class TranslateCog(commands.Cog, name="Translate"):
         Translate text to the specified language.
 
         Usage:
-          *t en <text>        — translate text to English
-          *t ru               — reply to a message to translate it to Russian
-          *translate de Hallo — translate "Hallo" to German
+          *t en <text>        - translate text to English
+          *t ru               - reply to a message to translate it to Russian
+          *translate de Hallo - translate "Hallo" to German
         """
         if lang_input is None:
-            embed = disnake.Embed(
-                title="📖 Translation",
-                description=(
-                    "**Usage:**\n"
-                    "`*t <lang> <text>` — translate text\n"
-                    "`*t <lang>` — reply to a message to translate it\n\n"
-                    "**Examples:**\n"
-                    "`*t en Привет мир` → Hello world\n"
-                    "`*t ru Hello` → Привет\n"
-                    "`*translate de Good morning` → Guten Morgen\n\n"
+            container = Container(
+                TextDisplay("## Translation"),
+                Separator(),
+                TextDisplay(
+                    "**Usage**\n"
+                    "`*t <lang> <text>` - translate text\n"
+                    "`*t <lang>` - reply to a message to translate it\n\n"
+                    "**Examples**\n"
+                    "`*t en Привет мир` -> Hello world\n"
+                    "`*t ru Hello` -> Привет\n"
+                    "`*translate de Good morning` -> Guten Morgen\n\n"
                     "**Codes:** `en`, `ru`, `de`, `fr`, `es`, `it`, `ja`, "
                     "`ko`, `zh-CN` …\n"
                     "Full names work too: `english`, `русский`, `немецкий` …"
                 ),
-                colour=USSR_COLOUR,
+                Separator(),
+                TextDisplay(f"-# {FOOTER_TEXT}"),
+                accent_colour=USSR_COLOUR,
             )
-            embed.set_footer(text=FOOTER_TEXT)
-            await ctx.send(embed=embed)
+            await ctx.send(components=[container])
             return
 
         target = self._resolve_lang(lang_input)
         if target is None:
             await ctx.send(
-                embed=self._error_embed(
-                    f"❌ Unknown language: `{lang_input}`\n"
-                    "Use an ISO code (`en`, `ru`, `de` …) or a full name "
-                    "(`english`, `русский` …)."
-                )
+                components=[
+                    self._error_container(
+                        f"**Unknown language:** `{lang_input}`\n"
+                        "Use an ISO code (`en`, `ru`, `de` …) or a full name "
+                        "(`english`, `русский` …)."
+                    )
+                ]
             )
             return
 
@@ -262,10 +281,13 @@ class TranslateCog(commands.Cog, name="Translate"):
 
         if not source_text:
             await ctx.send(
-                embed=self._error_embed(
-                    "❌ No text to translate.\n"
-                    "Provide text after the language code or reply to a message."
-                )
+                components=[
+                    self._error_container(
+                        "**No text to translate.**\n"
+                        "Provide text after the language code or reply to a "
+                        "message."
+                    )
+                ]
             )
             return
 
@@ -283,28 +305,30 @@ class TranslateCog(commands.Cog, name="Translate"):
         except Exception as exc:
             log.error("Translation error: %s", exc)
             await ctx.send(
-                embed=self._error_embed(f"❌ Translation failed: `{exc}`")
+                components=[
+                    self._error_container(
+                        f"**Translation failed:** `{exc}`"
+                    )
+                ]
             )
             return
 
         lang_name = self._lang_display(target)
+        preview = self._truncate(source_text, PREVIEW_LEN)
 
-        embed = disnake.Embed(description=result, colour=USSR_COLOUR)
-        embed.set_author(name=f"🌐 Translation → {lang_name}")
-
-        original_preview = (
-            source_text[:1024] if len(source_text) <= 1024
-            else source_text[:1021] + "…"
+        container = Container(
+            TextDisplay(f"## Translation -> {lang_name}"),
+            Separator(),
+            TextDisplay(result or "*(empty result)*"),
+            Separator(),
+            TextDisplay(f"**Original**\n{preview}"),
+            TextDisplay(f"**Language:** `{target}` - {lang_name}"),
+            Separator(),
+            TextDisplay(f"-# {FOOTER_TEXT}"),
+            accent_colour=USSR_COLOUR,
         )
-        embed.add_field(name="Original", value=original_preview, inline=False)
-        embed.add_field(
-            name="Language",
-            value=f"`{target}` — {lang_name}",
-            inline=True,
-        )
-        embed.set_footer(text=FOOTER_TEXT)
 
-        await ctx.send(embed=embed)
+        await ctx.send(components=[container])
 
 
 def setup(bot: commands.Bot):
