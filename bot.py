@@ -11,7 +11,9 @@ import disnake
 from disnake.ext import commands
 
 from utils.database import Database
+from keep_alive import keep_alive  # Импортируем функцию из файла
 
+keep_alive()  # Теперь это сработает отлично!
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
