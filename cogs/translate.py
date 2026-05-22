@@ -171,8 +171,10 @@ _LANG_DISPLAY: dict[str, str] = {
 
 MAX_TRANSLATE_LEN = 5000
 
-# Maximum length for the original-text preview inside the container.
 # A TextDisplay component can hold up to 4000 characters.
+TEXTDISPLAY_LIMIT = 4000
+
+# Maximum length for the original-text preview inside the container.
 PREVIEW_LEN = 1024
 
 
@@ -315,11 +317,16 @@ class TranslateCog(commands.Cog, name="Translate"):
 
         lang_name = self._lang_display(target)
         preview = self._truncate(source_text, PREVIEW_LEN)
+        translated = (
+            self._truncate(result, TEXTDISPLAY_LIMIT)
+            if result
+            else "*(empty result)*"
+        )
 
         container = Container(
             TextDisplay(f"## Translation -> {lang_name}"),
             Separator(),
-            TextDisplay(result or "*(empty result)*"),
+            TextDisplay(translated),
             Separator(),
             TextDisplay(f"**Original**\n{preview}"),
             TextDisplay(f"**Language:** `{target}` - {lang_name}"),
