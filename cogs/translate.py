@@ -6,6 +6,7 @@ Translates text from any language to any specified target language.
 Uses Google Translate via deep-translator.
 """
 
+import asyncio
 import logging
 
 import disnake
@@ -272,9 +273,13 @@ class TranslateCog(commands.Cog, name="Translate"):
             source_text = source_text[:MAX_TRANSLATE_LEN]
 
         try:
-            result = GoogleTranslator(
-                source="auto", target=target
-            ).translate(source_text)
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: GoogleTranslator(
+                    source="auto", target=target
+                ).translate(source_text),
+            )
         except Exception as exc:
             log.error("Translation error: %s", exc)
             await ctx.send(
