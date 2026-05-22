@@ -26,7 +26,7 @@ MAX_FILE_SIZE = 8 * 1024 * 1024
 class InterServerCog(commands.Cog, name="InterServer"):
     """Cog for the inter-server chat network."""
 
-    def __init__(self, bot: commands.InteractionBot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: Database = bot.db
         self.wh_manager = WebhookManager(bot)
@@ -65,6 +65,10 @@ class InterServerCog(commands.Cog, name="InterServer"):
             return
         # Ignore DMs
         if not message.guild:
+            return
+        # Ignore prefix command invocations (e.g. *t, *translate)
+        ctx = await self.bot.get_context(message)
+        if ctx.valid:
             return
         # Ignore if the channel is not linked
         if not await self.db.is_linked(message.channel.id):
@@ -274,6 +278,6 @@ class InterServerCog(commands.Cog, name="InterServer"):
         await inter.edit_original_response(content=text)
 
 
-def setup(bot: commands.InteractionBot):
+def setup(bot: commands.Bot):
     bot.add_cog(InterServerCog(bot))
     log.info("InterServer cog loaded.")

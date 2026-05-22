@@ -25,15 +25,17 @@ log = logging.getLogger("bot")
 TOKEN = os.getenv("DISCORD_TOKEN", "")
 
 
-def create_bot() -> commands.InteractionBot:
+def create_bot() -> commands.Bot:
     """Creates and configures the bot instance."""
     intents = disnake.Intents.default()
     intents.message_content = True  # required to read message text
     intents.guilds = True
     intents.webhooks = True
 
-    bot = commands.InteractionBot(
+    bot = commands.Bot(
+        command_prefix="*",
         intents=intents,
+        help_command=None,
         # Register slash commands globally across all servers
         test_guilds=None,
     )
@@ -52,6 +54,7 @@ async def main():
 
     # Load cogs
     bot.load_extension("cogs.interserver")
+    bot.load_extension("cogs.translate")
     log.info("Cogs loaded.")
 
     await bot.start(TOKEN)
